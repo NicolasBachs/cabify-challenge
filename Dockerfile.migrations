@@ -1,0 +1,14 @@
+FROM alpine:latest as base
+
+RUN apk --update upgrade && apk add \
+    ca-certificates \
+    curl \
+    tzdata \
+    bash \
+    && update-ca-certificates \
+    && rm -rf /var/cache/apk/*
+
+RUN curl -Lo /usr/bin/dbmate https://github.com/amacneil/dbmate/releases/download/v1.14.0/dbmate-linux-amd64 \
+    && chmod +x /usr/bin/dbmate
+
+WORKDIR /app

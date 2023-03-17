@@ -1,0 +1,22 @@
+@startuml arch
+
+Controller -> UseCase
+UseCase --> DistributedResourceSync
+DistributedResourceSync --> KVS
+UseCase --> Repository
+Repository --> Database
+UseCase -> EventDispatcher
+EventDispatcher -> KafkaTopic
+KafkaTopic -> KafkaConnect
+KafkaConnect -> Controller
+
+Controller:
+UseCase:
+Repository:
+EventDispatcher: Kafka
+KafkaTopic:
+Database: Postgres
+KVS: Redis
+KafkaConnect: HTTP Sink Connector
+
+@enduml

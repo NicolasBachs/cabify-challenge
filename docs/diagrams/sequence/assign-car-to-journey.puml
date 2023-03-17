@@ -1,0 +1,18 @@
+@startuml assign-car-to-journey
+participant JourneyUseCase
+participant DistributedResourceSync
+participant Redis
+participant Repository
+participant Database
+
+activate JourneyUseCase
+JourneyUseCase -> DistributedResourceSync: Acquire Lock (Journey ID)
+DistributedResourceSync -> Redis: Acquire Lock (Journey ID)
+JourneyUseCase -> JourneyUseCase: Check if journey is assignable
+JourneyUseCase -> DistributedResourceSync: Acquire Lock (Car ID)
+DistributedResourceSync -> Redis: Acquire Lock (Car ID)
+JourneyUseCase -> JourneyUseCase: Check if car has enough available seats
+JourneyUseCase -> Repository: Assign car to journey
+Repository -> Database: Assign car to journey
+deactivate JourneyUseCase
+@enduml

@@ -1,0 +1,26 @@
+app:
+  name: ${APP_NAME}
+  port: ${APP_PORT}
+  environment: ${APP_ENV}
+database: 
+  host: ${DB_HOST}
+  port: ${DB_PORT}
+  username: ${DB_USERNAME}
+  password: ${DB_PASSWORD}
+  name: ${DB_NAME}
+  connectionString: host=${DB_HOST} port=${DB_PORT} user=${DB_USERNAME} password=${DB_PASSWORD} dbname=${DB_NAME} sslmode=disable
+redis:
+  host: ${REDIS_HOST}
+  port: ${REDIS_PORT}
+  password: ${REDIS_PASSWORD}
+kafka:
+  host: ${KAFKA_HOST}
+  port: ${KAFKA_PORT}
+  topics:
+    NewCarAvailable: new-car-available
+    newPendingJourney: new-pending-journey
+etcd:
+  host: ${ETCD_HOST}
+  port: ${ETCD_CLIENT_PORT}
+  username: ${ETCD_USERNAME}
+  password: ${ETCD_PASSWORD}

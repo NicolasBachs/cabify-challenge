@@ -1,0 +1,230 @@
+version: "3.8"
+
+volumes:
+  database:
+    driver: local
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:latest
+    container_name: zookeeper
+    ports:
+      - "${ZOOKEEPER_PORT}:${ZOOKEEPER_PORT}"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: ${ZOOKEEPER_PORT}
+      ZOOKEEPER_TICK_TIME: 2000
+
+  kafka:
+    image: wurstmeister/kafka
+    container_name: kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "${KAFKA_PORT}:${KAFKA_PORT}"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_LISTENERS: PLAINTEXT://:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM: null
+      KAFKA_NUM_NETWORK_THREADS: 3
+      KAFKA_NUM_IO_THREADS: 8
+      KAFKA_SOCKET_SEND_BUFFER_BYTES: 102400
+      KAFKA_SOCKET_RECEIVE_BUFFER_BYTES: 102400
+      KAFKA_SOCKET_REQUEST_MAX_BYTES: 104857600
+      KAFKA_NUM_PARTITIONS: 1
+      KAFKA_NUM_RECOVERY_THREADS_PER_DATA_DIR: 1
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_LOG_RETENTION_HOURS: 168
+      KAFKA_LOG_SEGMENT_BYTES: 1073741824
+      KAFKA_LOG_RETENTION_CHECK_INTERVAL_MS: 300000
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_CREATE_TOPICS: "new-car-available:1:1,new-pending-journey:1:1"
+    volumes:
+      - ./.kafka/.kafka.server.properties:/etc/kafka/server.properties
+
+  kafka-connect:
+    image: confluentinc/cp-kafka-connect:latest
+    container_name: kafka-connect
+    ports:
+      - "8083:8083"
+    environment:
+      CONNECT_BOOTSTRAP_SERVERS: kafka:9092
+      CONNECT_GROUP_ID: connect-cluster
+      CONNECT_CONFIG_STORAGE_TOPIC: connect-configs
+      CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR: 1
+      CONNECT_OFFSET_STORAGE_TOPIC: connect-offsets
+      CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR: 1
+      CONNECT_STATUS_STORAGE_TOPIC: connect-status
+      CONNECT_STATUS_STORAGE_REPLICATION_FACTOR: 1
+      CONNECT_KEY_CONVERTER: org.apache.kafka.connect.storage.StringConverter
+      CONNECT_VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      CONNECT_REST_ADVERTISED_HOST_NAME: kafka-connect
+      CONNECT_REST_PORT: 8083
+      CONNECT_PLUGIN_PATH: /usr/share/java,/usr/share/confluent-hub-components/confluentinc-kafka-connect-http-1.6.6
+      CONNECT_REST_SERVLET_CONTEXT_PATH: "/"
+      CONNECT_REST_SERVLET_MAX_THREADS: "100"
+    volumes:
+      - "./infrastructure/event-dispatcher/kafka/connectors:/connectors"
+      - "./.kafka/.confluent-hub-components/confluentinc-kafka-connect-http-1.6.6:/usr/share/confluent-hub-components/confluentinc-kafka-connect-http-1.6.6"
+    depends_on:
+      - kafka
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail http://localhost:8083/ || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+  kafka-connect-publish:
+    image: curlimages/curl:latest
+    container_name: kafka-connect-publish
+    volumes:
+      - "./infrastructure/event-dispatcher/kafka/connectors:/connectors"
+      - "./.kafka/scripts:/scripts"
+    depends_on:
+      kafka-connect:
+        condition: service_healthy
+    entrypoint:
+      [
+        "sh",
+        "-c",
+        'while [ $$(curl -s -o /dev/null -w ''%{http_code}'' http://kafka-connect:8083) -ne 200 ]; do sleep 5; done; sh /scripts/publish-connectors.sh && tail -f /dev/null'
+      ]
+  database:
+    image: postgres:13
+    container_name: database
+    ports:
+      - "${DB_PORT}:${DB_PORT}"
+    environment:
+      POSTGRES_USER: "${DB_USERNAME}"
+      POSTGRES_PASSWORD: "${DB_PASSWORD}"
+      POSTGRES_DB: "${DB_NAME}"
+      PGPORT: "${DB_PORT}"
+    volumes:
+      - database:/data
+    restart: always
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${DB_USERNAME} -d ${DB_NAME} -h localhost -p ${DB_PORT}",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 3
+
+  migrations:
+    build:
+      context: .
+      dockerfile: Dockerfile.migrations
+      target: base
+    container_name: migrations
+    depends_on:
+      database:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: "postgres://${DB_USERNAME}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=disable"
+    volumes:
+      - ./:/app
+    entrypoint:
+      - sh
+      - -c
+    command:
+      - dbmate wait && dbmate up
+  redis:
+    image: "redis:7-alpine"
+    container_name: redis
+    restart: always
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    ports:
+      - "${REDIS_PORT}:${REDIS_PORT}"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+  pooling:
+    image: car-pooling-challenge:latest
+    container_name: pooling
+    depends_on:
+      database:
+        condition: service_healthy
+      migrations:
+        condition: service_started
+      kafka:
+        condition: service_started
+      kafka-connect:
+        condition: service_started
+      kafka-connect-publish:
+        condition: service_started
+      redis:
+        condition: service_healthy
+    ports:
+      - "${APP_PORT}:${APP_PORT}"
+    environment:
+      APP_NAME: ${APP_NAME}
+      APP_PORT: ${APP_PORT}
+      APP_ENV: ${APP_ENV}
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+      REDIS_HOST: ${REDIS_HOST}
+      REDIS_PORT: ${REDIS_PORT}
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      KAFKA_HOST: ${KAFKA_HOST}
+      KAFKA_PORT: ${KAFKA_PORT}
+      ZOOKEEPER_PORT: ${ZOOKEEPER_PORT}
+      TOPICS_CONFIG_JSON_PATH: ${TOPICS_CONFIG_JSON_PATH}
+      ETCD_HOST: "${ETCD_HOST}"
+      ETCD_CLIENT_PORT: "${ETCD_CLIENT_PORT}"
+      ETCD_USERNAME: "${ETCD_USERNAME}"
+      ETCD_PASSWORD: "${ETCD_PASSWORD}"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:${APP_PORT}/status"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    links:
+      - database
+      - kafka
+  harness:
+    image: cabify/challenge:latest
+    container_name: harness
+    depends_on:
+      database:
+        condition: service_healthy
+      migrations:
+        condition: service_started
+      kafka:
+        condition: service_started
+      kafka-connect:
+        condition: service_started
+      kafka-connect-publish:
+        condition: service_started
+      redis:
+        condition: service_healthy
+      pooling:
+        condition: service_healthy
+    command: /harness --address http://pooling:8080 "${CABIFY_CHALLENGE_TESTCASE:-acceptance}"
+    environment:
+      APP_NAME: ${APP_NAME}
+      APP_PORT: ${APP_PORT}
+      APP_ENV: ${APP_ENV}
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+      REDIS_HOST: ${REDIS_HOST}
+      REDIS_PORT: ${REDIS_PORT}
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      KAFKA_HOST: ${KAFKA_HOST}
+      KAFKA_PORT: ${KAFKA_PORT}
+      ZOOKEEPER_PORT: ${ZOOKEEPER_PORT}
+      TOPICS_CONFIG_JSON_PATH: ${TOPICS_CONFIG_JSON_PATH}
+      ETCD_HOST: "${ETCD_HOST}"
+      ETCD_CLIENT_PORT: "${ETCD_CLIENT_PORT}"
+      ETCD_USERNAME: "${ETCD_USERNAME}"
+      ETCD_PASSWORD: "${ETCD_PASSWORD}"

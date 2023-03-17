@@ -1,0 +1,44 @@
+---
+stages:
+  - acceptance
+  - container_image
+
+acceptance:
+  image: docker:latest
+  stage: acceptance
+  variables:
+    DOCKER_DRIVER: overlay2
+    DOCKER_TLS_CERTDIR: ""
+    DOCKER_HOST: tcp://docker:2375/
+  services:
+    - name: docker:dind
+      alias: docker
+  before_script:
+    - docker info
+    - docker-compose --version
+  script:
+    - apk add --no-cache make
+    - make env
+    - echo ${CI_JOB_TOKEN} | docker login --password-stdin -u ${CI_REGISTRY_USER} ${CI_REGISTRY}
+    - make test
+
+container_image:
+  image: docker:latest
+  stage: container_image
+  services:
+    - name: docker:dind
+  variables:
+    DOCKER_DRIVER: overlay2
+    DOCKER_TLS_CERTDIR: ""
+    DOCKER_HOST: tcp://docker:2375/
+  
+  script:
+    - apk add --no-cache make
+    - make env
+    - echo ${CI_JOB_TOKEN} | docker login --password-stdin -u ${CI_REGISTRY_USER} ${CI_REGISTRY}
+    - docker build . -t ${CI_REGISTRY_IMAGE}:latest
+    - docker push ${CI_REGISTRY_IMAGE}:latest
+    - docker-compose down 
+    - docker-compose rm -f 
+    - docker-compose build
+    - docker-compose push pooling

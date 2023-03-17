@@ -1,0 +1,323 @@
+definitions:
+  controller.createCarRequest:
+    properties:
+      id:
+        type: integer
+      seats:
+        type: integer
+    required:
+    - id
+    - seats
+    type: object
+  controller.createJourneyRequest:
+    properties:
+      id:
+        type: integer
+      people:
+        type: integer
+    required:
+    - id
+    - people
+    type: object
+  entity.Car:
+    properties:
+      availableSeats:
+        type: integer
+      creation_date:
+        type: string
+      delete_date:
+        type: string
+      id:
+        type: integer
+      journeys:
+        items:
+          $ref: '#/definitions/entity.Journey'
+        type: array
+      seats:
+        type: integer
+      update_date:
+        type: string
+    type: object
+  entity.Journey:
+    properties:
+      car:
+        $ref: '#/definitions/entity.Car'
+      car_assigned_id:
+        type: integer
+      creation_date:
+        type: string
+      delete_date:
+        type: string
+      group_id:
+        type: integer
+      id:
+        type: integer
+      passengers:
+        type: integer
+      status:
+        $ref: '#/definitions/enum.JourneyStatus'
+      update_date:
+        type: string
+    type: object
+  enum.JourneyStatus:
+    enum:
+    - PENDING
+    - ASSIGNED
+    - FINISHED
+    - CANCELLED
+    type: string
+    x-enum-varnames:
+    - JourneyStatusPending
+    - JourneyStatusAssigned
+    - JourneyStatusFinished
+    - JourneyStatusCancelled
+  response.CreateCarResponse:
+    properties:
+      car_id:
+        type: integer
+    type: object
+  response.ErrorResponse:
+    properties:
+      message:
+        type: string
+      status:
+        type: integer
+    type: object
+  response.PutCarsResponse:
+    properties:
+      car_ids:
+        items:
+          type: integer
+        type: array
+    type: object
+info:
+  contact: {}
+paths:
+  /cars:
+    post:
+      consumes:
+      - application/json
+      description: Create a new car with the provided data
+      parameters:
+      - description: Car to create
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/controller.createCarRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Car ID
+          schema:
+            $ref: '#/definitions/response.CreateCarResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      summary: Create car
+      tags:
+      - Cars
+    put:
+      consumes:
+      - application/json
+      description: Delete all existing data about cars and journeys and create new
+        cars with the provided data
+      parameters:
+      - description: Array of cars to create
+        in: body
+        name: request
+        required: true
+        schema:
+          items:
+            $ref: '#/definitions/controller.createCarRequest'
+          type: array
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.PutCarsResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      summary: Put cars
+      tags:
+      - Cars
+  /cars/{id}:
+    get:
+      description: Get car with the specified id
+      parameters:
+      - description: Car ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.Car'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      summary: Get car by ID
+      tags:
+      - Cars
+  /dropoff:
+    post:
+      consumes:
+      - application/x-www-form-urlencoded
+      description: Finish or cancell journey of the group with the specified ID
+      parameters:
+      - description: Group ID
+        in: formData
+        name: ID
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      summary: Drop off car
+      tags:
+      - Journeys
+  /journey:
+    post:
+      consumes:
+      - application/json
+      description: Create a new journey with the provided data
+      parameters:
+      - description: Journey to create
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/controller.createJourneyRequest'
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Accepted
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      summary: Create journey
+      tags:
+      - Journeys
+  /journeys/{id}:
+    get:
+      description: Get journey with the specified id
+      parameters:
+      - description: Journey ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.Journey'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      summary: Get journey by ID
+      tags:
+      - Journeys
+  /locate:
+    post:
+      consumes:
+      - application/x-www-form-urlencoded
+      description: Get car assigned to the group with the specified ID
+      parameters:
+      - description: Group ID
+        in: formData
+        name: ID
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.Car'
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      summary: Locate car
+      tags:
+      - Journeys
+  /status:
+    get:
+      description: Check if the service is healthy
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+      summary: Status of the service
+      tags:
+      - Healtcheck
+swagger: "2.0"

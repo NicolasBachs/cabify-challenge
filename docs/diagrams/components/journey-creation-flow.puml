@@ -1,0 +1,25 @@
+@startuml journey-creation-flow-using-components
+
+Controller --> UseCase: (1) Create Journey
+UseCase --> DistributedResourceSync: (2) Acquire Lock\n(Group ID)
+DistributedResourceSync -> UseCase: (3) Lock acquired\n(Group ID)
+UseCase --> UseCase: (4) Check if group\nhas not pending or assigned\njourney
+UseCase ---> Repository: (4) Create Journey
+Repository --> Database: (5) Insert Journey
+Database --> Repository: (6) Journey ID
+Repository --> UseCase: (7) Journey ID
+UseCase ---> EventDispatcher: (8) Event: New pending journey
+EventDispatcher -> KafkaTopic: (9) Msg: New pending journey
+UseCase -> DistributedResourceSync: (10) Release Lock\n(Group ID)
+DistributedResourceSync -> UseCase: (11) Lock released\n(Group ID)
+KafkaTopic --> KafkaConnect: (12) Msg: New pending journey
+KafkaConnect ---> Controller: (13) HTTP Request: New pending journey
+
+Controller: 
+UseCase:
+Repository:
+EventDispatcher:
+KafkaTopic:
+KafkaConnect: HTTP Sink Connector
+
+@enduml

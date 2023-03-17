@@ -1,0 +1,32 @@
+@startuml journey-creation
+actor Client
+participant Controller
+participant JourneyUseCase
+participant DistributedResourceSync
+participant Redis
+participant Repository
+participant Database
+participant EventDispatcher
+participant KafkaTopic
+participant KafkaConnect
+
+activate Client
+activate Controller
+Client -> Controller: Request: Create Journey
+Controller -> JourneyUseCase: Create Journey
+activate JourneyUseCase
+JourneyUseCase -> DistributedResourceSync: Acquire Lock (Group ID)
+DistributedResourceSync -> Redis: Acquire Lock (Group ID)
+JourneyUseCase -> JourneyUseCase: Check if group has not pending or assigned journey
+JourneyUseCase -> Repository: Create Journey
+Repository -> Database: Insert Journey
+JourneyUseCase -> EventDispatcher: Event: New pending journey
+EventDispatcher -> KafkaTopic: Msg: New pending journey
+JourneyUseCase -> DistributedResourceSync: Release Lock (Group ID)
+DistributedResourceSync -> Redis: Release Lock (Group ID)
+deactivate JourneyUseCase
+Controller -> Client: Response: Journey ID
+deactivate Controller
+deactivate Client
+KafkaTopic -> KafkaConnect: Msg: New pending journey
+@enduml

@@ -1,0 +1,25 @@
+{
+    
+    "name": "new-car-available-sink",
+    "config": {
+        "name": "new-car-available-sink",
+        "bootstrap.servers": "kafka:9092",
+        "connector.class": "io.confluent.connect.http.HttpSinkConnector",
+        "reporter.bootstrap.servers": "kafka:9092",
+        "reporter.result.topic.name": "success-responses",
+        "reporter.result.topic.replication.factor": "1",
+        "reporter.error.topic.name":"error-responses",
+        "reporter.error.topic.replication.factor":"1",
+        "tasks.max": "1",
+        "key.converter": "org.apache.kafka.connect.json.JsonConverter",
+        "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+        "key.converter.schemas.enable": "false",
+        "value.converter.schemas.enable": "false",
+        "confluent.license.topic.replication.factor": "1",
+        "confluent.topic.bootstrap.servers": "kafka:9092",
+        "confluent.topic.replication.factor": "1",
+        "headers": "Content-Type:application/json",
+        "topics": "new-car-available",
+        "http.api.url": "http://pooling:8080/consumers/new-car-available"
+    }
+}

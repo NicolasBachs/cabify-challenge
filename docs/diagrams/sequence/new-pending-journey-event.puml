@@ -1,0 +1,17 @@
+@startuml new-pending-journey-event
+participant KafkaConnect
+participant Controller
+participant JourneyUseCase
+
+activate Controller
+KafkaConnect -> Controller: Request: New pending journey
+JourneyUseCase -> JourneyUseCase: Check if journey is assignable
+JourneyUseCase -> CarUseCase: Get available cars with enough seating capacity
+loop For each available car with enough seating capacity
+    alt if journey doesn't have car assigned
+        JourneyUseCase -> JourneyUseCase: Assign car to journey
+    end
+end
+Controller -> KafkaConnect: Response to HTTP Sink Connector
+deactivate Controller
+@enduml
