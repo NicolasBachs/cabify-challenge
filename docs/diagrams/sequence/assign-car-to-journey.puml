@@ -14,5 +14,9 @@ DistributedResourceSync -> Redis: Acquire Lock (Car ID)
 JourneyUseCase -> JourneyUseCase: Check if car has enough available seats
 JourneyUseCase -> Repository: Assign car to journey
 Repository -> Database: Assign car to journey
+JourneyUseCase -> DistributedResourceSync: Release Lock (Car ID)
+DistributedResourceSync -> Redis: Release Lock (Car ID)
+JourneyUseCase -> DistributedResourceSync: Release Lock (Journey ID)
+DistributedResourceSync -> Redis: Release Lock (Journey ID)
 deactivate JourneyUseCase
 @enduml

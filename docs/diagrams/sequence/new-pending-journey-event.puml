@@ -5,6 +5,7 @@ participant JourneyUseCase
 
 activate Controller
 KafkaConnect -> Controller: Request: New pending journey
+Controller -> JourneyUseCase: New pending journey
 JourneyUseCase -> JourneyUseCase: Check if journey is assignable
 JourneyUseCase -> CarUseCase: Get available cars with enough seating capacity
 loop For each available car with enough seating capacity
